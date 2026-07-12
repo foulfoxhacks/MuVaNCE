@@ -14,6 +14,8 @@ Offline-first desktop workspace for RF mapping, heterogeneous radio scopes, floo
 - Persistent multi-floor building projects and imported floor-plan overlays
 - Guided empty-room calibration with per-radio statistics and live deviation scoring
 - Validated loopback-only UDP ingestion for Wi-Fi, BLE, CSI, and SDR bridges
+- Per-floor source placement that feeds localization and RF propagation
+- CSV export for buffered live and recorded signal samples
 
 This milestone does **not** claim operational human localization or vital-sign detection. Those features require supported CSI hardware, synchronized capture, room-specific calibration, and measured validation.
 
