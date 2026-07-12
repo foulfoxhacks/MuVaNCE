@@ -26,3 +26,5 @@ Create the desktop installer with `npm run dist`.
 ## Architecture direction
 
 Hardware integrations implement a normalized timestamped sample interface. The UI and fusion engine do not depend on a specific chipset. Planned providers include Windows WLAN RSSI, BLE advertisements, ESP32 CSI over UDP/serial, research NIC CSI, and SDR streams.
+
+The first live bridge is available now: start the loopback UDP listener from the Detection Laboratory and follow [the sensor protocol](docs/sensor-protocol.md). A local development transmitter is included at `scripts/send-demo-sensor.mjs`.

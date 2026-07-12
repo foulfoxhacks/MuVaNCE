@@ -2,7 +2,30 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
+const dgram = require('dgram');
 const execFileAsync = promisify(execFile);
+let sensorSocket=null; let sensorPort=null;
+
+function normalizeSensorFrame(value) {
+  if(!value||typeof value!=='object'||typeof value.adapterId!=='string')return null;
+  const kind=['wifi','ble','csi','sdr'].includes(value.kind)?value.kind:null;
+  const nums=['rssi','phase','amplitude','motion','channel'];
+  if(!kind||nums.some(k=>typeof value[k]!=='number'||!Number.isFinite(value[k])))return null;
+  return {adapterId:value.adapterId.slice(0,80),kind,timestamp:typeof value.timestamp==='number'?value.timestamp:Date.now(),rssi:Math.max(-140,Math.min(20,value.rssi)),phase:value.phase,amplitude:Math.max(0,value.amplitude),motion:Math.max(0,value.motion),channel:Math.max(0,Math.round(value.channel))};
+}
+
+async function startSensorListener(event, requestedPort=5006) {
+  const port=Number(requestedPort);
+  if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('Port must be between 1024 and 65535');
+  if(sensorSocket)return {running:true,port:sensorPort};
+  const win=BrowserWindow.fromWebContents(event.sender);
+  sensorSocket=dgram.createSocket('udp4');
+  sensorSocket.on('message',buffer=>{try{const raw=JSON.parse(buffer.toString('utf8'));const values=Array.isArray(raw)?raw:[raw];const frames=values.map(normalizeSensorFrame).filter(Boolean);if(frames.length&&win&&!win.isDestroyed())win.webContents.send('hardware:sensor-frames',frames)}catch{}});
+  sensorSocket.on('error',()=>stopSensorListener());
+  await new Promise((resolve,reject)=>{sensorSocket.once('error',reject);sensorSocket.bind(port,'127.0.0.1',()=>{sensorSocket.removeListener('error',reject);resolve()})});
+  sensorPort=port; return {running:true,port};
+}
+function stopSensorListener(){if(sensorSocket){sensorSocket.close();sensorSocket=null}sensorPort=null;return {running:false,port:null}}
 
 async function scanWindowsWifi() {
   if (process.platform !== 'win32') return [];
@@ -24,6 +47,8 @@ async function scanWindowsWifi() {
 }
 
 ipcMain.handle('hardware:scan-wifi', scanWindowsWifi);
+ipcMain.handle('hardware:start-sensors', startSensorListener);
+ipcMain.handle('hardware:stop-sensors', stopSensorListener);
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -31,8 +56,9 @@ function createWindow() {
     backgroundColor: '#070b12', titleBarStyle: 'hiddenInset',
     webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname,'preload.cjs') }
   });
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  win.loadFile(path.join(__dirname, '..', 'app-dist', 'index.html'));
 }
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.on('before-quit', stopSensorListener);
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
