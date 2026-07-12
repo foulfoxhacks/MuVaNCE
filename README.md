@@ -30,7 +30,7 @@ Generated installers are written to `release/`; application web assets are isola
 
 ### Blank window troubleshooting
 
-Version 0.2.0 emitted absolute web asset paths and could open as an empty Electron window after installation. This is corrected in 0.2.1 with relative packaged asset paths. Install 0.2.1 or newer; startup failures now display a diagnostic dialog instead of a silent blank canvas.
+Version 0.2.0 emitted absolute web asset paths and could open as an empty Electron window after installation. This is corrected in 0.2.1 and newer with relative packaged asset paths; startup failures now display a diagnostic dialog instead of a silent blank canvas.
 
 ## Architecture direction
 
