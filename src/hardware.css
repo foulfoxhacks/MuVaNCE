@@ -5,3 +5,6 @@
 .network div b{display:block;color:#dce7f4;font-size:11px}
 .network div span{font:8px DM Mono;color:#687e92}
 .network strong{font:12px DM Mono;color:#8ca0b2}
+.floor-tabs{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid #1d2b39;background:#09111a}
+.floor-tabs button{border:0;background:transparent;color:#687e92;padding:6px 10px;font:9px DM Mono;cursor:pointer}
+.floor-tabs button.active{background:#153027;color:#55e6a5;border-radius:4px}
