@@ -1,20 +1,674 @@
-import { useEffect, useState } from 'react';
-import { Activity, Bluetooth, CircleStop, Download, FlaskConical, Map, Pause, Play, Radio, Settings2, Usb, Wifi } from 'lucide-react';
-import { ADAPTERS, estimateOccupancy, pathLossHeat } from './engine';
-import { useAppStore } from './store';
-import type { SignalSample } from './types';
-import { onSensorFrames, openFloorPlan, openProject, saveCapture, saveProject, scanWifi, startSensors, stopSensors, type WifiNetwork } from './hardware';
-import { deviationScore } from './calibration';
+import { useEffect, useState } from "react";
+import {
+  Activity,
+  Bluetooth,
+  CircleStop,
+  Download,
+  FlaskConical,
+  Map,
+  Pause,
+  Play,
+  Radio,
+  Settings2,
+  Usb,
+  Wifi,
+} from "lucide-react";
+import { ADAPTERS, estimateOccupancy, pathLossHeat } from "./engine";
+import { useAppStore } from "./store";
+import type { SignalSample } from "./types";
+import {
+  onSensorFrames,
+  openFloorPlan,
+  openProject,
+  saveCapture,
+  saveProject,
+  scanWifi,
+  startSensors,
+  stopSensors,
+  type WifiNetwork,
+} from "./hardware";
+import { deviationScore } from "./calibration";
 
-const colors={wifi:'#53b9ff',ble:'#a888ff',csi:'#55e6a5',sdr:'#ffb454'};
-function Spark({samples,field,color}:{samples:SignalSample[];field:'rssi'|'motion'|'amplitude';color:string}){const vals=Array.from({length:48},(_,i)=>{const base=samples[i%samples.length]?.[field]??0;return field==='rssi'?base+70:base*50});const points=vals.map((v,i)=>`${i*100/(vals.length-1)},${42-v*.48}`).join(' ');return <svg viewBox="0 0 100 44" preserveAspectRatio="none"><polyline points={points} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke"/></svg>}
-function Sidebar(){const s=useAppStore();const nav=[['map',Map,'Spatial map'],['scope',Activity,'Live scopes'],['devices',Usb,'Adapters'],['lab',FlaskConical,'Detection lab']] as const;return <aside><div className="brand"><div className="mark">M</div><div><b>MuVance</b><span>MAP VIEW</span></div></div><nav>{nav.map(([id,Icon,label])=><button className={s.view===id?'active':''} onClick={()=>s.setView(id)} key={id}><Icon size={18}/>{label}</button>)}</nav><div className="side-bottom"><button className={s.view==='settings'?'active':''} onClick={()=>s.setView('settings')}><Settings2 size={18}/>Settings</button><div className="privacy"><i/>LOCAL PROCESSING<span>No cloud connection</span></div></div></aside>}
-function Topbar(){const s=useAppStore();const[exporting,setExporting]=useState(false);async function exportCapture(){setExporting(true);await saveCapture(s.history.flat());setExporting(false)}return <header><div><h1>{s.view==='map'?'Spatial intelligence':s.view==='scope'?'Live signal scopes':s.view==='devices'?'Adapter manager':s.view==='lab'?'Detection laboratory':'Project settings'}</h1><p>{s.floors.find(f=>f.id===s.activeFloorId)?.name??'Building'} · Local session</p></div><div className="controls"><span className="live"><i/>LIVE</span><button onClick={s.toggleRun}>{s.running?<Pause size={16}/>:<Play size={16}/>} {s.running?'Pause':'Resume'}</button><button onClick={exportCapture} disabled={!s.history.length||exporting}><Download size={16}/>{exporting?'Exporting…':'Export CSV'}</button><button className={s.recording?'recording':''} onClick={s.toggleRecord}>{s.recording?<CircleStop size={16}/>:<Radio size={16}/>} {s.recording?'Stop recording':'Record'}</button></div></header>}
-function MapView(){const s=useAppStore();const[layer,setLayer]=useState<'occupancy'|'wifi'|'ble'>('occupancy');const floor=s.floors.find(f=>f.id===s.activeFloorId)??s.floors[0];const est=estimateOccupancy(s.samples);const cells=Array.from({length:100},(_,n)=>({x:(n%10)*10+5,y:Math.floor(n/10)*10+5}));if(!floor)return null;const visibleAdapters=layer==='wifi'?ADAPTERS.filter(a=>a.kind==='wifi'||a.kind==='csi'):layer==='ble'?ADAPTERS.filter(a=>a.kind==='ble'):ADAPTERS;const heatSamples=layer==='wifi'?s.samples.filter(v=>v.kind==='wifi'||v.kind==='csi'):layer==='ble'?s.samples.filter(v=>v.kind==='ble'):s.samples;async function importPlan(){const file=await openFloorPlan();if(file)s.setFloorPlan(file)}return <div className="map-layout"><section className="map-card"><div className="floor-tabs">{s.floors.map(f=><button className={f.id===floor.id?'active':''} key={f.id} onClick={()=>s.selectFloor(f.id)}>{f.name}</button>)}<button onClick={s.addFloor}>＋ Add level</button></div><div className="map-toolbar"><div><b>{floor.name}</b><span>{floor.imageName??'24.3 m × 18.1 m'} · saved locally</span></div><div><button onClick={importPlan}>{floor.imageData?'Replace plan':'Import plan'}</button>{floor.imageData&&<button onClick={()=>s.setFloorPlan()}>Remove</button>}<button className={layer==='occupancy'?'selected':''} onClick={()=>setLayer('occupancy')}>Occupancy</button><button className={layer==='wifi'?'selected':''} onClick={()=>setLayer('wifi')}>Wi-Fi</button><button className={layer==='ble'?'selected':''} onClick={()=>setLayer('ble')}>Bluetooth</button></div></div><div className={`floorplan layer-${layer}`}>{floor.imageData&&<img className="floor-image" src={floor.imageData} alt="Imported floor plan" style={{opacity:floor.imageOpacity??.42}}/>}{cells.map((c,i)=><i key={i} className="heat" style={{left:`${c.x}%`,top:`${c.y}%`,opacity:pathLossHeat(c.x,c.y,heatSamples)*.55}}/>)}{floor.walls.map(w=><div key={w.id} className={`wall ${w.material}`} style={{left:`${w.start.x}%`,top:`${w.start.y}%`,width:`${Math.hypot(w.end.x-w.start.x,w.end.y-w.start.y)}%`,transform:`rotate(${Math.atan2(w.end.y-w.start.y,w.end.x-w.start.x)}rad)`}}/>)}{visibleAdapters.map(a=><button title={a.name} key={a.id} className={`node ${a.kind} ${s.selectedAdapter===a.id?'selected-node':''}`} style={{left:`${a.position.x}%`,top:`${a.position.y}%`}} onClick={()=>s.selectAdapter(a.id)}>{a.kind==='ble'?<Bluetooth/>:<Wifi/>}</button>)}{layer==='occupancy'&&<div className="person" style={{left:`${est.position.x}%`,top:`${est.position.y}%`}}><i/><span>{Math.round(est.confidence*100)}% confidence</span></div>}<div className="room r1">STUDIO</div><div className="room r2">MEETING</div><div className="room r3">LOUNGE</div></div><div className="legend"><span><i className="low"/>Low {layer==='occupancy'?'energy':'signal'}</span><span><i className="high"/>High {layer==='occupancy'?'energy':'signal'}</span><span>{layer==='occupancy'?`Model: probabilistic fusion · ${est.sources} sources`:`${visibleAdapters.length} ${layer.toUpperCase()} sources visible`}</span></div></section><RightPanel/></div>}
-function RightPanel(){const s=useAppStore();const est=estimateOccupancy(s.samples);return <section className="right-panel"><div className="metric"><span>OCCUPANCY</span><strong>1</strong><p>person estimated</p><div className="confidence"><i style={{width:`${est.confidence*100}%`}}/></div><small>{Math.round(est.confidence*100)}% confidence</small></div><div className="metric"><span>MOTION ENERGY</span><strong>{est.motion.toFixed(2)}</strong><p>normalized signal</p></div><h3>Signal sources</h3>{ADAPTERS.map((a,i)=>{const v=s.samples[i];return <button className="source" key={a.id} onClick={()=>s.selectAdapter(a.id)}><i style={{background:colors[a.kind]}}/><div><b>{a.name}</b><span>{a.kind.toUpperCase()} · {a.status}</span></div><strong>{v?.rssi.toFixed(0)}<small>dBm</small></strong></button>})}<div className="notice"><Radio size={17}/><div><b>Calibration model active</b><span>Demo data · replace with captured baseline before operational use.</span></div></div></section>}
-function ScopeCard({adapter,index,samples}:{adapter:(typeof ADAPTERS)[number];index:number;samples:SignalSample[]}){const[field,setField]=useState<'rssi'|'motion'|'amplitude'>(adapter.kind==='wifi'?'rssi':adapter.kind==='ble'?'amplitude':'motion');const current=samples.filter(v=>v.adapterId===adapter.id);const latest=current[current.length-1];return <section className="scope"><div><span><i style={{background:colors[adapter.kind]}}/>{adapter.name}</span><small>{latest?.rssi.toFixed(1)??'—'} dBm</small></div><div className="scope-filters">{(['rssi','amplitude','motion'] as const).map(v=><button className={field===v?'active':''} onClick={()=>setField(v)} key={v}>{v}</button>)}</div><Spark samples={current.length?current:[samples[index]].filter(Boolean)} field={field} color={colors[adapter.kind]}/><footer><span>{adapter.kind.toUpperCase()}</span><span>CH {latest?.channel||'—'}</span><span>{current.length} samples</span></footer></section>}
-function Scopes(){const s=useAppStore();const samples=[...s.history.flat(),...s.samples];return <div className="scopes">{ADAPTERS.map((a,i)=><ScopeCard key={a.id} adapter={a} index={i} samples={samples}/>)}</div>}
-function Devices(){const[networks,setNetworks]=useState<WifiNetwork[]>([]);const[scanning,setScanning]=useState(false);async function refresh(){setScanning(true);setNetworks(await scanWifi());setScanning(false)}return <div className="device-grid">{ADAPTERS.map(a=><section className="device" key={a.id}><div className={`device-icon ${a.kind}`}>{a.kind==='ble'?<Bluetooth/>:<Wifi/>}</div><div><span>{a.kind.toUpperCase()} ADAPTER</span><h2>{a.name}</h2><p>{a.capabilities.join(' · ')}</p></div><i className={a.status}/><b>{a.status}</b><button>Configure</button></section>)}<section className="add-device"><Usb/><b>Windows Wi-Fi discovery</b><span>{window.muvanceHardware?'OS-backed passive network scan':'Available in packaged desktop app'}</span><button onClick={refresh} disabled={scanning}>{scanning?'Scanning…':'Scan nearby networks'}</button></section>{networks.length>0&&<section className="networks"><div><span>DISCOVERED NETWORKS</span><b>{networks.length} visible</b></div>{networks.map(n=><div className="network" key={`${n.ssid}-${n.bssid}`}><Wifi size={16}/><div><b>{n.ssid}</b><span>{n.bssid} · CH {n.channel} · {n.radio}</span></div><strong>{n.signal}%</strong></div>)}</section>}</div>}
-function Lab(){const s=useAppStore();const[live,setLive]=useState(false);const profile=s.calibrations.find(c=>c.floorId===s.activeFloorId);const score=deviationScore(s.samples,profile);async function toggle(){const state=live?await stopSensors():await startSensors(5006);setLive(state.running)}return <div className="lab"><section><span>BASELINE</span><h2>{s.calibrating?'Capturing empty room…':'Environment calibration'}</h2><p>{s.calibrating?`${s.calibrationFrames.length} frames captured. Keep the floor empty and radios stationary; finish after at least 10 frames.`:profile?`Baseline saved with ${profile.adapters.length} sources. Current environmental deviation: ${Math.round(score*100)}%.`:'Record an empty room baseline so MuVance measures link disturbance instead of treating raw RSSI as a coordinate.'}</p><div className="button-row">{s.calibrating?<><button onClick={s.finishCalibration} disabled={s.calibrationFrames.length<10}>Finish calibration</button><button onClick={s.cancelCalibration}>Cancel</button></>:<button onClick={s.startCalibration}>Start empty-room capture</button>}</div></section><section><span>LIVE INGESTION</span><h2>UDP sensor bridge · 127.0.0.1:5006</h2><p>Accepts validated Wi-Fi, BLE, CSI, or SDR sample frames from a local serial bridge or trusted capture process. Network exposure is intentionally loopback-only.</p><button onClick={toggle}>{live?'Stop sensor listener':'Start sensor listener'}</button></section><section className="warning"><span>VALIDATION</span><h2>No operational claims yet</h2><p>{s.liveHardware?'Live hardware frames are active. Validate each room and sensor layout before interpreting occupancy.':'Simulated input is active until valid sensor frames arrive. Detection accuracy requires supported hardware and measured validation.'}</p></section></div>}
-function Settings(){const s=useAppStore();const[message,setMessage]=useState('');async function exportFile(){const ok=await saveProject({schemaVersion:1,exportedAt:Date.now(),activeFloorId:s.activeFloorId,floors:s.floors,calibrations:s.calibrations});setMessage(ok?'Project exported successfully.':'Export cancelled.')}async function importFile(){const project=await openProject();if(project){s.replaceProject(project);setMessage('Project imported successfully.')}}return <div className="settings-grid"><section><span>PORTABLE PROJECT</span><h2>Back up this building</h2><p>Export all floors, embedded plans, wall geometry, and calibration profiles to a versioned MuVance JSON project.</p><div className="button-row"><button onClick={exportFile}>Export project</button><button onClick={importFile}>Import project</button></div>{message&&<small>{message}</small>}</section><section><span>PROJECT SUMMARY</span><h2>{s.floors.length} floor{s.floors.length===1?'':'s'} · {s.calibrations.length} calibration{s.calibrations.length===1?'':'s'}</h2><p>Projects remain local unless you explicitly export and move the resulting file.</p></section></div>}
-export function App(){const s=useAppStore();useEffect(()=>{const id=setInterval(s.tick,100);const unsubscribe=onSensorFrames(s.ingest);return()=>{clearInterval(id);unsubscribe()}},[s.tick,s.ingest]);return <div className="app"><Sidebar/><main><Topbar/><div className="content">{s.view==='map'?<MapView/>:s.view==='scope'?<Scopes/>:s.view==='devices'?<Devices/>:s.view==='lab'?<Lab/>:<Settings/>}</div></main></div>}
+const colors = {
+  wifi: "#53b9ff",
+  ble: "#a888ff",
+  csi: "#55e6a5",
+  sdr: "#ffb454",
+};
+function Spark({
+  samples,
+  field,
+  color,
+}: {
+  samples: SignalSample[];
+  field: "rssi" | "motion" | "amplitude";
+  color: string;
+}) {
+  const vals = Array.from({ length: 48 }, (_, i) => {
+    const base = samples[i % samples.length]?.[field] ?? 0;
+    return field === "rssi" ? base + 70 : base * 50;
+  });
+  const points = vals
+    .map((v, i) => `${(i * 100) / (vals.length - 1)},${42 - v * 0.48}`)
+    .join(" ");
+  return (
+    <svg viewBox="0 0 100 44" preserveAspectRatio="none">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+function Sidebar() {
+  const s = useAppStore();
+  const nav = [
+    ["map", Map, "Spatial map"],
+    ["scope", Activity, "Live scopes"],
+    ["devices", Usb, "Adapters"],
+    ["lab", FlaskConical, "Detection lab"],
+  ] as const;
+  return (
+    <aside>
+      <div className="brand">
+        <div className="mark">M</div>
+        <div>
+          <b>MuVance</b>
+          <span>MAP VIEW</span>
+        </div>
+      </div>
+      <nav>
+        {nav.map(([id, Icon, label]) => (
+          <button
+            className={s.view === id ? "active" : ""}
+            onClick={() => s.setView(id)}
+            key={id}
+          >
+            <Icon size={18} />
+            {label}
+          </button>
+        ))}
+      </nav>
+      <div className="side-bottom">
+        <button
+          className={s.view === "settings" ? "active" : ""}
+          onClick={() => s.setView("settings")}
+        >
+          <Settings2 size={18} />
+          Settings
+        </button>
+        <div className="privacy">
+          <i />
+          LOCAL PROCESSING<span>No cloud connection</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+function Topbar() {
+  const s = useAppStore();
+  const [exporting, setExporting] = useState(false);
+  async function exportCapture() {
+    setExporting(true);
+    await saveCapture(s.history.flat());
+    setExporting(false);
+  }
+  return (
+    <header>
+      <div>
+        <h1>
+          {s.view === "map"
+            ? "Spatial intelligence"
+            : s.view === "scope"
+              ? "Live signal scopes"
+              : s.view === "devices"
+                ? "Adapter manager"
+                : s.view === "lab"
+                  ? "Detection laboratory"
+                  : "Project settings"}
+        </h1>
+        <p>
+          {s.floors.find((f) => f.id === s.activeFloorId)?.name ?? "Building"} ·
+          Local session
+        </p>
+      </div>
+      <div className="controls">
+        <span className="live">
+          <i />
+          LIVE
+        </span>
+        <button onClick={s.toggleRun}>
+          {s.running ? <Pause size={16} /> : <Play size={16} />}{" "}
+          {s.running ? "Pause" : "Resume"}
+        </button>
+        <button
+          onClick={exportCapture}
+          disabled={!s.history.length || exporting}
+        >
+          <Download size={16} />
+          {exporting ? "Exporting…" : "Export CSV"}
+        </button>
+        <button
+          className={s.recording ? "recording" : ""}
+          onClick={s.toggleRecord}
+        >
+          {s.recording ? <CircleStop size={16} /> : <Radio size={16} />}{" "}
+          {s.recording ? "Stop recording" : "Record"}
+        </button>
+      </div>
+    </header>
+  );
+}
+function MapView() {
+  const s = useAppStore();
+  const [layer, setLayer] = useState<"occupancy" | "wifi" | "ble">("occupancy");
+  const [placing, setPlacing] = useState(false);
+  const floor = s.floors.find((f) => f.id === s.activeFloorId) ?? s.floors[0];
+  const adapters = ADAPTERS.map((adapter) => ({
+    ...adapter,
+    position:
+      s.adapterPositions[s.activeFloorId]?.[adapter.id] ?? adapter.position,
+  }));
+  const est = estimateOccupancy(s.samples, adapters);
+  const cells = Array.from({ length: 100 }, (_, n) => ({
+    x: (n % 10) * 10 + 5,
+    y: Math.floor(n / 10) * 10 + 5,
+  }));
+  if (!floor) return null;
+  const visibleAdapters =
+    layer === "wifi"
+      ? adapters.filter((a) => a.kind === "wifi" || a.kind === "csi")
+      : layer === "ble"
+        ? adapters.filter((a) => a.kind === "ble")
+        : adapters;
+  const heatSamples =
+    layer === "wifi"
+      ? s.samples.filter((v) => v.kind === "wifi" || v.kind === "csi")
+      : layer === "ble"
+        ? s.samples.filter((v) => v.kind === "ble")
+        : s.samples;
+  async function importPlan() {
+    const file = await openFloorPlan();
+    if (file) s.setFloorPlan(file);
+  }
+  function placeSource(event: React.MouseEvent<HTMLDivElement>) {
+    if (!placing || !s.selectedAdapter) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    s.placeAdapter(s.selectedAdapter, {
+      x: Math.max(
+        0,
+        Math.min(100, ((event.clientX - rect.left) / rect.width) * 100),
+      ),
+      y: Math.max(
+        0,
+        Math.min(100, ((event.clientY - rect.top) / rect.height) * 100),
+      ),
+    });
+  }
+  return (
+    <div className="map-layout">
+      <section className="map-card">
+        <div className="floor-tabs">
+          {s.floors.map((f) => (
+            <button
+              className={f.id === floor.id ? "active" : ""}
+              key={f.id}
+              onClick={() => s.selectFloor(f.id)}
+            >
+              {f.name}
+            </button>
+          ))}
+          <button onClick={s.addFloor}>＋ Add level</button>
+        </div>
+        <div className="map-toolbar">
+          <div>
+            <b>{floor.name}</b>
+            <span>{floor.imageName ?? "24.3 m × 18.1 m"} · saved locally</span>
+          </div>
+          <div>
+            <button
+              className={placing ? "selected" : ""}
+              onClick={() => setPlacing(!placing)}
+            >
+              Place sources
+            </button>
+            {placing && (
+              <button onClick={s.resetAdapterPositions}>Reset positions</button>
+            )}
+            <button onClick={importPlan}>
+              {floor.imageData ? "Replace plan" : "Import plan"}
+            </button>
+            {floor.imageData && (
+              <button onClick={() => s.setFloorPlan()}>Remove</button>
+            )}
+            <button
+              className={layer === "occupancy" ? "selected" : ""}
+              onClick={() => setLayer("occupancy")}
+            >
+              Occupancy
+            </button>
+            <button
+              className={layer === "wifi" ? "selected" : ""}
+              onClick={() => setLayer("wifi")}
+            >
+              Wi-Fi
+            </button>
+            <button
+              className={layer === "ble" ? "selected" : ""}
+              onClick={() => setLayer("ble")}
+            >
+              Bluetooth
+            </button>
+          </div>
+        </div>
+        <div
+          className={`floorplan layer-${layer} ${placing ? "placing" : ""}`}
+          onClick={placeSource}
+        >
+          {floor.imageData && (
+            <img
+              className="floor-image"
+              src={floor.imageData}
+              alt="Imported floor plan"
+              style={{ opacity: floor.imageOpacity ?? 0.42 }}
+            />
+          )}
+          {cells.map((c, i) => (
+            <i
+              key={i}
+              className="heat"
+              style={{
+                left: `${c.x}%`,
+                top: `${c.y}%`,
+                opacity: pathLossHeat(c.x, c.y, heatSamples, adapters) * 0.55,
+              }}
+            />
+          ))}
+          {floor.walls.map((w) => (
+            <div
+              key={w.id}
+              className={`wall ${w.material}`}
+              style={{
+                left: `${w.start.x}%`,
+                top: `${w.start.y}%`,
+                width: `${Math.hypot(w.end.x - w.start.x, w.end.y - w.start.y)}%`,
+                transform: `rotate(${Math.atan2(w.end.y - w.start.y, w.end.x - w.start.x)}rad)`,
+              }}
+            />
+          ))}
+          {visibleAdapters.map((a) => (
+            <button
+              title={a.name}
+              key={a.id}
+              className={`node ${a.kind} ${s.selectedAdapter === a.id ? "selected-node" : ""}`}
+              style={{ left: `${a.position.x}%`, top: `${a.position.y}%` }}
+              onClick={(event) => {
+                event.stopPropagation();
+                s.selectAdapter(a.id);
+              }}
+            >
+              {a.kind === "ble" ? <Bluetooth /> : <Wifi />}
+            </button>
+          ))}
+          {layer === "occupancy" && (
+            <div
+              className="person"
+              style={{ left: `${est.position.x}%`, top: `${est.position.y}%` }}
+            >
+              <i />
+              <span>{Math.round(est.confidence * 100)}% confidence</span>
+            </div>
+          )}
+          <div className="room r1">STUDIO</div>
+          <div className="room r2">MEETING</div>
+          <div className="room r3">LOUNGE</div>
+        </div>
+        <div className="legend">
+          <span>
+            <i className="low" />
+            Low {layer === "occupancy" ? "energy" : "signal"}
+          </span>
+          <span>
+            <i className="high" />
+            High {layer === "occupancy" ? "energy" : "signal"}
+          </span>
+          <span>
+            {layer === "occupancy"
+              ? placing
+                ? "Placement mode · positions save per floor"
+                : `Model: probabilistic fusion · ${est.sources} sources`
+              : `${visibleAdapters.length} ${layer.toUpperCase()} sources visible`}
+          </span>
+        </div>
+      </section>
+      <RightPanel />
+    </div>
+  );
+}
+function RightPanel() {
+  const s = useAppStore();
+  const est = estimateOccupancy(s.samples);
+  return (
+    <section className="right-panel">
+      <div className="metric">
+        <span>OCCUPANCY</span>
+        <strong>1</strong>
+        <p>person estimated</p>
+        <div className="confidence">
+          <i style={{ width: `${est.confidence * 100}%` }} />
+        </div>
+        <small>{Math.round(est.confidence * 100)}% confidence</small>
+      </div>
+      <div className="metric">
+        <span>MOTION ENERGY</span>
+        <strong>{est.motion.toFixed(2)}</strong>
+        <p>normalized signal</p>
+      </div>
+      <h3>Signal sources</h3>
+      {ADAPTERS.map((a, i) => {
+        const v = s.samples[i];
+        return (
+          <button
+            className="source"
+            key={a.id}
+            onClick={() => s.selectAdapter(a.id)}
+          >
+            <i style={{ background: colors[a.kind] }} />
+            <div>
+              <b>{a.name}</b>
+              <span>
+                {a.kind.toUpperCase()} · {a.status}
+              </span>
+            </div>
+            <strong>
+              {v?.rssi.toFixed(0)}
+              <small>dBm</small>
+            </strong>
+          </button>
+        );
+      })}
+      <div className="notice">
+        <Radio size={17} />
+        <div>
+          <b>Calibration model active</b>
+          <span>
+            Demo data · replace with captured baseline before operational use.
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+function ScopeCard({
+  adapter,
+  index,
+  samples,
+}: {
+  adapter: (typeof ADAPTERS)[number];
+  index: number;
+  samples: SignalSample[];
+}) {
+  const [field, setField] = useState<"rssi" | "motion" | "amplitude">(
+    adapter.kind === "wifi"
+      ? "rssi"
+      : adapter.kind === "ble"
+        ? "amplitude"
+        : "motion",
+  );
+  const current = samples.filter((v) => v.adapterId === adapter.id);
+  const latest = current[current.length - 1];
+  return (
+    <section className="scope">
+      <div>
+        <span>
+          <i style={{ background: colors[adapter.kind] }} />
+          {adapter.name}
+        </span>
+        <small>{latest?.rssi.toFixed(1) ?? "—"} dBm</small>
+      </div>
+      <div className="scope-filters">
+        {(["rssi", "amplitude", "motion"] as const).map((v) => (
+          <button
+            className={field === v ? "active" : ""}
+            onClick={() => setField(v)}
+            key={v}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+      <Spark
+        samples={current.length ? current : [samples[index]].filter(Boolean)}
+        field={field}
+        color={colors[adapter.kind]}
+      />
+      <footer>
+        <span>{adapter.kind.toUpperCase()}</span>
+        <span>CH {latest?.channel || "—"}</span>
+        <span>{current.length} samples</span>
+      </footer>
+    </section>
+  );
+}
+function Scopes() {
+  const s = useAppStore();
+  const samples = [...s.history.flat(), ...s.samples];
+  return (
+    <div className="scopes">
+      {ADAPTERS.map((a, i) => (
+        <ScopeCard key={a.id} adapter={a} index={i} samples={samples} />
+      ))}
+    </div>
+  );
+}
+function Devices() {
+  const [networks, setNetworks] = useState<WifiNetwork[]>([]);
+  const [scanning, setScanning] = useState(false);
+  async function refresh() {
+    setScanning(true);
+    setNetworks(await scanWifi());
+    setScanning(false);
+  }
+  return (
+    <div className="device-grid">
+      {ADAPTERS.map((a) => (
+        <section className="device" key={a.id}>
+          <div className={`device-icon ${a.kind}`}>
+            {a.kind === "ble" ? <Bluetooth /> : <Wifi />}
+          </div>
+          <div>
+            <span>{a.kind.toUpperCase()} ADAPTER</span>
+            <h2>{a.name}</h2>
+            <p>{a.capabilities.join(" · ")}</p>
+          </div>
+          <i className={a.status} />
+          <b>{a.status}</b>
+          <button>Configure</button>
+        </section>
+      ))}
+      <section className="add-device">
+        <Usb />
+        <b>Windows Wi-Fi discovery</b>
+        <span>
+          {window.muvanceHardware
+            ? "OS-backed passive network scan"
+            : "Available in packaged desktop app"}
+        </span>
+        <button onClick={refresh} disabled={scanning}>
+          {scanning ? "Scanning…" : "Scan nearby networks"}
+        </button>
+      </section>
+      {networks.length > 0 && (
+        <section className="networks">
+          <div>
+            <span>DISCOVERED NETWORKS</span>
+            <b>{networks.length} visible</b>
+          </div>
+          {networks.map((n) => (
+            <div className="network" key={`${n.ssid}-${n.bssid}`}>
+              <Wifi size={16} />
+              <div>
+                <b>{n.ssid}</b>
+                <span>
+                  {n.bssid} · CH {n.channel} · {n.radio}
+                </span>
+              </div>
+              <strong>{n.signal}%</strong>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+function Lab() {
+  const s = useAppStore();
+  const [live, setLive] = useState(false);
+  const profile = s.calibrations.find((c) => c.floorId === s.activeFloorId);
+  const score = deviationScore(s.samples, profile);
+  async function toggle() {
+    const state = live ? await stopSensors() : await startSensors(5006);
+    setLive(state.running);
+  }
+  return (
+    <div className="lab">
+      <section>
+        <span>BASELINE</span>
+        <h2>
+          {s.calibrating ? "Capturing empty room…" : "Environment calibration"}
+        </h2>
+        <p>
+          {s.calibrating
+            ? `${s.calibrationFrames.length} frames captured. Keep the floor empty and radios stationary; finish after at least 10 frames.`
+            : profile
+              ? `Baseline saved with ${profile.adapters.length} sources. Current environmental deviation: ${Math.round(score * 100)}%.`
+              : "Record an empty room baseline so MuVance measures link disturbance instead of treating raw RSSI as a coordinate."}
+        </p>
+        <div className="button-row">
+          {s.calibrating ? (
+            <>
+              <button
+                onClick={s.finishCalibration}
+                disabled={s.calibrationFrames.length < 10}
+              >
+                Finish calibration
+              </button>
+              <button onClick={s.cancelCalibration}>Cancel</button>
+            </>
+          ) : (
+            <button onClick={s.startCalibration}>
+              Start empty-room capture
+            </button>
+          )}
+        </div>
+      </section>
+      <section>
+        <span>LIVE INGESTION</span>
+        <h2>UDP sensor bridge · 127.0.0.1:5006</h2>
+        <p>
+          Accepts validated Wi-Fi, BLE, CSI, or SDR sample frames from a local
+          serial bridge or trusted capture process. Network exposure is
+          intentionally loopback-only.
+        </p>
+        <button onClick={toggle}>
+          {live ? "Stop sensor listener" : "Start sensor listener"}
+        </button>
+      </section>
+      <section className="warning">
+        <span>VALIDATION</span>
+        <h2>No operational claims yet</h2>
+        <p>
+          {s.liveHardware
+            ? "Live hardware frames are active. Validate each room and sensor layout before interpreting occupancy."
+            : "Simulated input is active until valid sensor frames arrive. Detection accuracy requires supported hardware and measured validation."}
+        </p>
+      </section>
+    </div>
+  );
+}
+function Settings() {
+  const s = useAppStore();
+  const [message, setMessage] = useState("");
+  async function exportFile() {
+    const ok = await saveProject({
+      schemaVersion: 1,
+      exportedAt: Date.now(),
+      activeFloorId: s.activeFloorId,
+      floors: s.floors,
+      calibrations: s.calibrations,
+      adapterPositions: s.adapterPositions,
+    });
+    setMessage(ok ? "Project exported successfully." : "Export cancelled.");
+  }
+  async function importFile() {
+    const project = await openProject();
+    if (project) {
+      s.replaceProject(project);
+      setMessage("Project imported successfully.");
+    }
+  }
+  return (
+    <div className="settings-grid">
+      <section>
+        <span>PORTABLE PROJECT</span>
+        <h2>Back up this building</h2>
+        <p>
+          Export all floors, embedded plans, wall geometry, and calibration
+          profiles to a versioned MuVance JSON project.
+        </p>
+        <div className="button-row">
+          <button onClick={exportFile}>Export project</button>
+          <button onClick={importFile}>Import project</button>
+        </div>
+        {message && <small>{message}</small>}
+      </section>
+      <section>
+        <span>PROJECT SUMMARY</span>
+        <h2>
+          {s.floors.length} floor{s.floors.length === 1 ? "" : "s"} ·{" "}
+          {s.calibrations.length} calibration
+          {s.calibrations.length === 1 ? "" : "s"}
+        </h2>
+        <p>
+          Projects remain local unless you explicitly export and move the
+          resulting file.
+        </p>
+      </section>
+    </div>
+  );
+}
+export function App() {
+  const s = useAppStore();
+  useEffect(() => {
+    const id = setInterval(s.tick, 100);
+    const unsubscribe = onSensorFrames(s.ingest);
+    return () => {
+      clearInterval(id);
+      unsubscribe();
+    };
+  }, [s.tick, s.ingest]);
+  return (
+    <div className="app">
+      <Sidebar />
+      <main>
+        <Topbar />
+        <div className="content">
+          {s.view === "map" ? (
+            <MapView />
+          ) : s.view === "scope" ? (
+            <Scopes />
+          ) : s.view === "devices" ? (
+            <Devices />
+          ) : s.view === "lab" ? (
+            <Lab />
+          ) : (
+            <Settings />
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

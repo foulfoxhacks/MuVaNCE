@@ -18,4 +18,10 @@ describe('spatial engine', () => {
     expect(pathLossHeat(50,50,createSamples(3_000))).toBeGreaterThanOrEqual(0);
     expect(pathLossHeat(50,50,createSamples(3_000))).toBeLessThanOrEqual(1);
   });
+  it('uses edited adapter coordinates for propagation', () => {
+    const sample=createSamples(4_000).slice(0,1);
+    const near=[{...ADAPTERS[0],position:{x:50,y:50}}];
+    const far=[{...ADAPTERS[0],position:{x:0,y:0}}];
+    expect(pathLossHeat(50,50,sample,near)).toBeGreaterThan(pathLossHeat(50,50,sample,far));
+  });
 });
