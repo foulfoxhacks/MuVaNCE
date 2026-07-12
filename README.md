@@ -11,6 +11,9 @@ Offline-first desktop workspace for RF mapping, heterogeneous radio scopes, floo
 - Probabilistic multi-source occupancy estimate with confidence
 - Local recording state and automated spatial-engine tests
 - Sandboxed Windows WLAN discovery for BSSID, channel, radio type, and signal percentage
+- Persistent multi-floor building projects and imported floor-plan overlays
+- Guided empty-room calibration with per-radio statistics and live deviation scoring
+- Validated loopback-only UDP ingestion for Wi-Fi, BLE, CSI, and SDR bridges
 
 This milestone does **not** claim operational human localization or vital-sign detection. Those features require supported CSI hardware, synchronized capture, room-specific calibration, and measured validation.
 
@@ -22,6 +25,8 @@ npm run dev
 ```
 
 Create the desktop installer with `npm run dist`.
+
+Generated installers are written to `release/`; application web assets are isolated in `app-dist/` so normal builds never overwrite release artifacts.
 
 ## Architecture direction
 
