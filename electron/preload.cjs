@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('muvanceHardware', {
   ,openFloorPlan: () => ipcRenderer.invoke('project:open-floor-plan')
   ,saveProject: project => ipcRenderer.invoke('project:save',project)
   ,openProject: () => ipcRenderer.invoke('project:open')
+  ,saveCapture: frames => ipcRenderer.invoke('capture:save',frames)
 });
