@@ -28,6 +28,10 @@ Create the desktop installer with `npm run dist`.
 
 Generated installers are written to `release/`; application web assets are isolated in `app-dist/` so normal builds never overwrite release artifacts.
 
+### Blank window troubleshooting
+
+Version 0.2.0 emitted absolute web asset paths and could open as an empty Electron window after installation. This is corrected in 0.2.1 with relative packaged asset paths. Install 0.2.1 or newer; startup failures now display a diagnostic dialog instead of a silent blank canvas.
+
 ## Architecture direction
 
 Hardware integrations implement a normalized timestamped sample interface. The UI and fusion engine do not depend on a specific chipset. Planned providers include Windows WLAN RSSI, BLE advertisements, ESP32 CSI over UDP/serial, research NIC CSI, and SDR streams.

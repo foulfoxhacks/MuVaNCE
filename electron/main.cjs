@@ -62,10 +62,16 @@ ipcMain.handle('project:open-floor-plan', async event => {
 function createWindow() {
   const win = new BrowserWindow({
     width: 1500, height: 940, minWidth: 1100, minHeight: 700,
-    backgroundColor: '#070b12', titleBarStyle: 'hiddenInset',
+    backgroundColor: '#070b12', title: 'MuVance Map View',
     webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname,'preload.cjs') }
   });
-  win.loadFile(path.join(__dirname, '..', 'app-dist', 'index.html'));
+  const entry=path.join(__dirname, '..', 'app-dist', 'index.html');
+  win.webContents.on('did-fail-load',(_event,code,description)=>{
+    const message=`MuVance could not load its interface.\n\n${description} (${code})\n\nExpected application entry:\n${entry}`;
+    dialog.showErrorBox('MuVance startup error',message);
+  });
+  win.webContents.on('render-process-gone',(_event,details)=>dialog.showErrorBox('MuVance renderer stopped',`The interface process stopped: ${details.reason}. Restart MuVance; if this repeats, report this message.`));
+  win.loadFile(entry).catch(error=>dialog.showErrorBox('MuVance startup error',error.message));
 }
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
