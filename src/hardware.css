@@ -9,3 +9,4 @@
 .floor-tabs button{border:0;background:transparent;color:#687e92;padding:6px 10px;font:9px DM Mono;cursor:pointer}
 .floor-tabs button.active{background:#153027;color:#55e6a5;border-radius:4px}
 .button-row{display:flex;gap:8px}.button-row button:disabled{opacity:.4;cursor:not-allowed}
+.floor-image{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:grayscale(1) contrast(1.2);z-index:0;pointer-events:none}

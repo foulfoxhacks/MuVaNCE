@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const dgram = require('dgram');
+const { readFile } = require('fs/promises');
 const execFileAsync = promisify(execFile);
 let sensorSocket=null; let sensorPort=null;
 
@@ -49,6 +50,14 @@ async function scanWindowsWifi() {
 ipcMain.handle('hardware:scan-wifi', scanWindowsWifi);
 ipcMain.handle('hardware:start-sensors', startSensorListener);
 ipcMain.handle('hardware:stop-sensors', stopSensorListener);
+ipcMain.handle('project:open-floor-plan', async event => {
+  const win=BrowserWindow.fromWebContents(event.sender);
+  const result=await dialog.showOpenDialog(win,{title:'Import floor plan',properties:['openFile'],filters:[{name:'Floor plan images',extensions:['png','jpg','jpeg','webp','svg']}]});
+  if(result.canceled||!result.filePaths[0])return null;
+  const filePath=result.filePaths[0];const data=await readFile(filePath);if(data.length>1024*1024)throw new Error('Floor plan must be smaller than 1 MB in this milestone');
+  const ext=path.extname(filePath).slice(1).toLowerCase();const mime=ext==='svg'?'image/svg+xml':ext==='jpg'||ext==='jpeg'?'image/jpeg':ext==='webp'?'image/webp':'image/png';
+  return{name:path.basename(filePath),dataUrl:`data:${mime};base64,${data.toString('base64')}`};
+});
 
 function createWindow() {
   const win = new BrowserWindow({
