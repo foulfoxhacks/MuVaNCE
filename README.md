@@ -1,4 +1,4 @@
-# MuVance Map View
+# MuVaNCE Map View
 
 Offline-first desktop workspace for RF mapping, heterogeneous radio scopes, floor-plan calibration, and confidence-aware occupancy research.
 
