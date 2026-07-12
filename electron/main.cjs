@@ -3,7 +3,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const dgram = require('dgram');
-const { readFile } = require('fs/promises');
+const { readFile, writeFile } = require('fs/promises');
 const execFileAsync = promisify(execFile);
 let sensorSocket=null; let sensorPort=null;
 
@@ -58,6 +58,8 @@ ipcMain.handle('project:open-floor-plan', async event => {
   const ext=path.extname(filePath).slice(1).toLowerCase();const mime=ext==='svg'?'image/svg+xml':ext==='jpg'||ext==='jpeg'?'image/jpeg':ext==='webp'?'image/webp':'image/png';
   return{name:path.basename(filePath),dataUrl:`data:${mime};base64,${data.toString('base64')}`};
 });
+ipcMain.handle('project:save',async(event,project)=>{if(!project||project.schemaVersion!==1||!Array.isArray(project.floors))throw new Error('Invalid project');const win=BrowserWindow.fromWebContents(event.sender);const result=await dialog.showSaveDialog(win,{title:'Save MuVance project',defaultPath:'building.muvance.json',filters:[{name:'MuVance projects',extensions:['json']}]});if(result.canceled||!result.filePath)return false;await writeFile(result.filePath,JSON.stringify(project,null,2),'utf8');return true});
+ipcMain.handle('project:open',async event=>{const win=BrowserWindow.fromWebContents(event.sender);const result=await dialog.showOpenDialog(win,{title:'Open MuVance project',properties:['openFile'],filters:[{name:'MuVance projects',extensions:['json']}]});if(result.canceled||!result.filePaths[0])return null;const data=await readFile(result.filePaths[0]);if(data.length>20*1024*1024)throw new Error('Project file is too large');const project=JSON.parse(data.toString('utf8'));if(project?.schemaVersion!==1||!Array.isArray(project.floors)||!Array.isArray(project.calibrations))throw new Error('Not a valid MuVance project');return project});
 
 function createWindow() {
   const win = new BrowserWindow({
