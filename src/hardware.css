@@ -1,0 +1,7 @@
+.add-device button{margin-top:14px;border:1px solid #285342;background:#10231d;color:#4de2aa;padding:7px 11px}
+.networks{grid-column:1/-1;background:#0b121cdd;border:1px solid #1d2b39;padding:18px}
+.networks>div:first-child{display:flex;justify-content:space-between;font:9px DM Mono;color:#6d8295}
+.network{display:grid;grid-template-columns:26px 1fr auto;align-items:center;padding:12px 4px;border-bottom:1px solid #172431;color:#53b9ff}
+.network div b{display:block;color:#dce7f4;font-size:11px}
+.network div span{font:8px DM Mono;color:#687e92}
+.network strong{font:12px DM Mono;color:#8ca0b2}

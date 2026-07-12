@@ -1,1 +1,28 @@
-# MuVaNCE
+# MuVance Map View
+
+Offline-first desktop workspace for RF mapping, heterogeneous radio scopes, floor-plan calibration, and confidence-aware occupancy research.
+
+## Current milestone
+
+- Electron-compatible React/TypeScript desktop shell
+- Wi-Fi, BLE, CSI, and future SDR adapter model
+- Live scopes, RF heat map, floor geometry, adapter manager, and detection lab
+- Simulated inputs with explicit demo/validation labeling
+- Probabilistic multi-source occupancy estimate with confidence
+- Local recording state and automated spatial-engine tests
+- Sandboxed Windows WLAN discovery for BSSID, channel, radio type, and signal percentage
+
+This milestone does **not** claim operational human localization or vital-sign detection. Those features require supported CSI hardware, synchronized capture, room-specific calibration, and measured validation.
+
+## Run
+
+```powershell
+npm install
+npm run dev
+```
+
+Create the desktop installer with `npm run dist`.
+
+## Architecture direction
+
+Hardware integrations implement a normalized timestamped sample interface. The UI and fusion engine do not depend on a specific chipset. Planned providers include Windows WLAN RSSI, BLE advertisements, ESP32 CSI over UDP/serial, research NIC CSI, and SDR streams.
